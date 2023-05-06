@@ -2,12 +2,15 @@ package com.example.mycamera1;
 
 import android.hardware.Camera;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+
+import org.opencv.android.OpenCVLoader;
 
 import java.io.IOException;
 
@@ -31,7 +34,7 @@ public class MainActivity extends AppCompatActivity implements Camera.PreviewCal
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main); // podłaczenie widoku z pliku activity_main.xml w folderze layout - tam ustawia się jak elementy będą widoczne na ekranie
+        setContentView(R.layout.activity_main);
 
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
@@ -49,6 +52,8 @@ public class MainActivity extends AppCompatActivity implements Camera.PreviewCal
         } catch (IOException e) {
             e.printStackTrace();
         }
+//        if(OpenCVLoader.initDebug()) Log.d("LOADED","success");
+//        else Log.d("LOADED","err");
     }
 
     @Override

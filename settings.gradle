@@ -14,3 +14,8 @@ dependencyResolutionManagement {
 }
 rootProject.name = "mycamera1"
 include ':app'
+
+include ':openCVLibrary343'
+include ':openCVLibrary343'
+include ':openCVLibrary343'
+include ':openCV'
