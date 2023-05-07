@@ -3,6 +3,6 @@
 3    package="org.opencv" >
 4
 5    <uses-sdk android:minSdkVersion="24" />
-5-->C:\Users\piotr\AndroidStudioProjects\mycamera1\openCV\java\AndroidManifest.xml
+5-->C:\Users\Kacper\Documents\GitHub\camera1-vr-ar\openCV\java\AndroidManifest.xml
 6
 7</manifest>

@@ -1,5 +1,9 @@
 package com.example.mycamera1;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.hardware.Camera;
 import android.os.Bundle;
 import android.util.Log;
@@ -10,24 +14,42 @@ import android.view.WindowManager;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.CameraBridgeViewBase;
+import org.opencv.android.JavaCameraView;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
+import org.opencv.core.Core;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
+import org.opencv.imgproc.Imgproc;
 
 import java.io.IOException;
 
-public class MainActivity extends AppCompatActivity implements Camera.PreviewCallback, SurfaceHolder.Callback {
+public class MainActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2 {
 
-    private SurfaceView surfaceView;
-    private SurfaceHolder surfaceHolder0;
-    private Camera camera;
 
-    private Camera.AutoFocusCallback autoFocusCallback = new Camera.AutoFocusCallback() {
+    JavaCameraView javaCameraView;
+    Mat mRGBA, mRGBAT;
+
+    BaseLoaderCallback baseLoaderCallback = new BaseLoaderCallback(MainActivity.this) {
         @Override
-        public void onAutoFocus(boolean success, Camera camera) {
-            if (success) {
-                // Obsługa sukcesu w ustawieniu ostrości
-            } else {
-                // Obsługa niepowodzenia w ustawieniu ostrości
+        public void onManagerConnected(int status) {
+            switch (status)
+            {
+                case BaseLoaderCallback.SUCCESS:
+                {
+                    javaCameraView.enableView();
+                    break;
+                }
+                default:
+                {
+                    super.onManagerConnected(status);
+                    break;
+                }
+
             }
+
         }
     };
 
@@ -36,51 +58,59 @@ public class MainActivity extends AppCompatActivity implements Camera.PreviewCal
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        javaCameraView = (JavaCameraView) findViewById(R.id.my_camera_view);
+        javaCameraView.setVisibility(SurfaceView.VISIBLE);
+        javaCameraView.setCvCameraViewListener(MainActivity.this);
+    }
 
-        surfaceView = findViewById(R.id.surfaceView);
 
-        surfaceHolder0 = surfaceView.getHolder();
+    @Override
+    public void onCameraViewStarted(int width, int height) {
+        mRGBA = new Mat(height, width, CvType.CV_8UC4);
+    }
 
-        surfaceHolder0.addCallback(this);
+    @Override
+    public void onCameraViewStopped() {
 
-        // Otwieranie kamery
-        try {
-            camera = Camera.open();
-            camera.setPreviewDisplay(surfaceHolder0);
-            camera.startPreview();
-        } catch (IOException e) {
-            e.printStackTrace();
+        mRGBA.release();
+    }
+
+    @Override
+    public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
+        mRGBA = inputFrame.rgba();
+        mRGBAT = mRGBA.t();
+        Core.flip(mRGBA.t(), mRGBAT, 1);
+        Imgproc.resize(mRGBAT, mRGBAT, mRGBA.size());
+        return mRGBAT;
+    }
+
+    @Override
+    public void onPointerCaptureChanged(boolean hasCapture) {
+
+    }
+
+    @Override
+    protected void onDestroy(){
+        super.onDestroy();
+
+        if(javaCameraView!=null){
+            javaCameraView.disableView();
         }
-//        if(OpenCVLoader.initDebug()) Log.d("LOADED","success");
-//        else Log.d("LOADED","err");
     }
 
-    @Override
-    public void onPreviewFrame(byte[] bytes, Camera camera) {
-
-    }
 
     @Override
-    public void surfaceCreated(@NonNull SurfaceHolder surfaceHolder) {
+    protected void onPause(){
+        super.onPause();
 
-    }
-
-    @Override
-    public void surfaceChanged(@NonNull SurfaceHolder surfaceHolder, int i, int i1, int i2) {
-        try {
-            camera.setPreviewDisplay(surfaceHolder0);
-            camera.startPreview();
-            camera.autoFocus(autoFocusCallback); // wywołanie metody autoFocus z przekazaniem obiektu AutoFocusCallback
-
-        } catch (IOException e) {
-            e.printStackTrace();
+        if(javaCameraView!=null){
+            javaCameraView.disableView();
         }
-
     }
 
     @Override
-    public void surfaceDestroyed(@NonNull SurfaceHolder surfaceHolder) {
+    protected void onResume(){
+        super.onResume();
 
     }
 }
