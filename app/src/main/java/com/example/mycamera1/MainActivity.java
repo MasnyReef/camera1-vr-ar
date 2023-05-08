@@ -27,8 +27,6 @@ import org.opencv.imgproc.Imgproc;
 import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2 {
-
-
     JavaCameraView javaCameraView;
     Mat mRGBA, mRGBAT;
 
@@ -47,9 +45,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
                     super.onManagerConnected(status);
                     break;
                 }
-
             }
-
         }
     };
 
@@ -57,12 +53,10 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
         javaCameraView = (JavaCameraView) findViewById(R.id.my_camera_view);
         javaCameraView.setVisibility(SurfaceView.VISIBLE);
         javaCameraView.setCvCameraViewListener(MainActivity.this);
     }
-
 
     @Override
     public void onCameraViewStarted(int width, int height) {
@@ -71,7 +65,6 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
 
     @Override
     public void onCameraViewStopped() {
-
         mRGBA.release();
     }
 
@@ -86,23 +79,19 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
 
     @Override
     public void onPointerCaptureChanged(boolean hasCapture) {
-
     }
 
     @Override
     protected void onDestroy(){
         super.onDestroy();
-
         if(javaCameraView!=null){
             javaCameraView.disableView();
         }
     }
 
-
     @Override
     protected void onPause(){
         super.onPause();
-
         if(javaCameraView!=null){
             javaCameraView.disableView();
         }
@@ -111,6 +100,5 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     @Override
     protected void onResume(){
         super.onResume();
-
     }
 }
