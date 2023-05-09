@@ -29,9 +29,11 @@ import org.opencv.android.Utils;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.Rect;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -39,7 +41,8 @@ import java.util.List;
 public class MainActivity extends CameraActivity {
 
     CameraBridgeViewBase cameraBridgeViewBase;
-    Mat mRGBA, mRGBAT;
+    SurfaceView surfaceView;
+    Mat mRGBA ,gray;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -52,26 +55,55 @@ public class MainActivity extends CameraActivity {
 
         getPermission();
 
-        cameraBridgeViewBase = findViewById(R.id.my_camera_view);
+        surfaceView = findViewById(R.id.my_camera_view2);
+
+        // Inicjowanie SurfaceView
+        surfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
+            @Override
+            public void surfaceCreated(SurfaceHolder holder) {}
+
+            @Override
+            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {}
+
+            @Override
+            public void surfaceDestroyed(SurfaceHolder holder) {}
+        });
+
+        cameraBridgeViewBase = findViewById(R.id.my_camera_view1);
 
         cameraBridgeViewBase.setCvCameraViewListener(new CameraBridgeViewBase.CvCameraViewListener2() {
             @Override
             public void onCameraViewStarted(int width, int height) {
+                mRGBA = new Mat();
+                gray = new Mat();
 
             }
 
             @Override
             public void onCameraViewStopped() {
-
+                mRGBA.release();
+                gray.release();
             }
 
             @Override
             public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
                 mRGBA = inputFrame.rgba();
-//                mRGBAT = mRGBA.t();
-//                Core.flip(mRGBA.t(), mRGBAT, 1);
-//                Imgproc.resize(mRGBAT, mRGBAT, mRGBA.size());
-//                return mRGBAT;
+
+                // Skopiowanie klatki z JavaCameraView do Mat
+                Mat rgbaCopy = mRGBA.clone();
+
+                // Konwersja do skali szarości
+                Imgproc.cvtColor(mRGBA, gray, Imgproc.COLOR_RGBA2GRAY);
+
+                // Wyświetlenie klatki z JavaCameraView na SurfaceView
+                Canvas canvas = surfaceView.getHolder().lockCanvas();
+                if (canvas != null) {
+                    Bitmap bitmap = Bitmap.createBitmap(mRGBA.width(), mRGBA.height(), Bitmap.Config.ARGB_8888);
+                    Utils.matToBitmap(rgbaCopy, bitmap);
+                    canvas.drawBitmap(bitmap, 0, 0, null);
+                    surfaceView.getHolder().unlockCanvasAndPost(canvas);
+                }
+
                 return mRGBA;
             }
         });
