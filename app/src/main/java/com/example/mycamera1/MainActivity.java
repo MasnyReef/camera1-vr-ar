@@ -3,51 +3,47 @@ package com.example.mycamera1;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
-import android.graphics.Color;
-import android.hardware.Camera;
+import android.graphics.Matrix;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
-import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.WindowManager;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 
-import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraActivity;
 import org.opencv.android.CameraBridgeViewBase;
-import org.opencv.android.JavaCameraView;
-import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
-import org.opencv.core.Core;
-import org.opencv.core.CvType;
 import org.opencv.core.Mat;
-import org.opencv.core.Rect;
+import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.BinaryBitmap;
+import com.google.zxing.DecodeHintType;
+import com.google.zxing.MultiFormatReader;
+import com.google.zxing.RGBLuminanceSource;
+import com.google.zxing.Result;
+import com.google.zxing.common.HybridBinarizer;
 
 public class MainActivity extends CameraActivity {
 
     CameraBridgeViewBase cameraBridgeViewBase;
-    SurfaceView surfaceView;
+    SurfaceView surfaceView1, surfaceView2;
+    TextView textView1 , textView2;
     Mat mRGBA ,gray;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
 
         //ustawienie fullscreen
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -55,19 +51,12 @@ public class MainActivity extends CameraActivity {
 
         getPermission();
 
-        surfaceView = findViewById(R.id.my_camera_view2);
+        surfaceView1 = findViewById(R.id.my_camera_view2);
+        surfaceView2 = findViewById(R.id.my_camera_view3);
 
-        // Inicjowanie SurfaceView
-        surfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
-            @Override
-            public void surfaceCreated(SurfaceHolder holder) {}
+        textView1 = findViewById(R.id.my_text_view1);
+        textView2 = findViewById(R.id.my_text_view2);
 
-            @Override
-            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {}
-
-            @Override
-            public void surfaceDestroyed(SurfaceHolder holder) {}
-        });
 
         cameraBridgeViewBase = findViewById(R.id.my_camera_view1);
 
@@ -89,19 +78,36 @@ public class MainActivity extends CameraActivity {
             public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
                 mRGBA = inputFrame.rgba();
 
+
+                float scaleX = (float) surfaceView1.getWidth() / mRGBA.width();
+                float scaleY = (float) surfaceView1.getHeight() / mRGBA.height();
+
+                Matrix matrix = new Matrix();
+                matrix.setScale(scaleX, scaleY);
+
                 // Skopiowanie klatki z JavaCameraView do Mat
                 Mat rgbaCopy = mRGBA.clone();
 
                 // Konwersja do skali szarości
                 Imgproc.cvtColor(mRGBA, gray, Imgproc.COLOR_RGBA2GRAY);
 
+                Bitmap bitmap = Bitmap.createBitmap(mRGBA.width(), mRGBA.height(), Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(rgbaCopy, bitmap);
+                processQRCode(bitmap);
+
                 // Wyświetlenie klatki z JavaCameraView na SurfaceView
-                Canvas canvas = surfaceView.getHolder().lockCanvas();
-                if (canvas != null) {
-                    Bitmap bitmap = Bitmap.createBitmap(mRGBA.width(), mRGBA.height(), Bitmap.Config.ARGB_8888);
-                    Utils.matToBitmap(rgbaCopy, bitmap);
-                    canvas.drawBitmap(bitmap, 0, 0, null);
-                    surfaceView.getHolder().unlockCanvasAndPost(canvas);
+                Canvas canvas1 = surfaceView1.getHolder().lockCanvas();
+                Canvas canvas2 = surfaceView2.getHolder().lockCanvas();
+
+                if (canvas1 != null && canvas2 != null) {
+
+                    canvas1.setMatrix(matrix);
+                    canvas1.drawBitmap(bitmap, 0, 0, null);
+                    surfaceView1.getHolder().unlockCanvasAndPost(canvas1);
+
+                    canvas2.setMatrix(matrix);
+                    canvas2.drawBitmap(bitmap, 0, 0, null);
+                    surfaceView2.getHolder().unlockCanvasAndPost(canvas2);
                 }
 
                 return mRGBA;
@@ -149,107 +155,43 @@ public class MainActivity extends CameraActivity {
             getPermission();
         }
     }
+
+
+    private String lastQRCode = ""; // Zmienna przechowująca ostatnio odczytany kod QR
+    private static final int TEXT_CLEAR_DELAY = 1000; // Opóźnienie w milisekundach
+
+    private Handler handler = new Handler();
+    private Runnable clearTextRunnable = new Runnable() {
+        @Override
+        public void run() {
+            textView1.setText("");
+            textView2.setText("");
+        }
+    };
+
+    private void processQRCode(Bitmap bitmap) {
+        int[] intArray = new int[bitmap.getWidth() * bitmap.getHeight()];
+        bitmap.getPixels(intArray, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
+        RGBLuminanceSource source = new RGBLuminanceSource(bitmap.getWidth(), bitmap.getHeight(), intArray);
+        BinaryBitmap binaryBitmap = new BinaryBitmap(new HybridBinarizer(source));
+
+        MultiFormatReader reader = new MultiFormatReader();
+        try {
+            Result result = reader.decode(binaryBitmap);
+            String qrCode = result.getText();
+            // Tutaj możesz obsłużyć odczytany kod QR
+            Log.d("QRScannerActivity", "Zeskanowany kod QR: " + qrCode);
+            textView1.setText(qrCode);
+            textView2.setText(qrCode);
+
+            handler.removeCallbacks(clearTextRunnable); // Usuń istniejące zaplanowane wyczyszczenie
+            handler.postDelayed(clearTextRunnable, TEXT_CLEAR_DELAY);
+        } catch (Exception e) {
+            // Obsłuż błąd dekodowania kodu QR
+            e.printStackTrace();
+            //textView.setText("");
+        }
+    }
 }
 
 
-//public class MainActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2 {
-//
-//
-//    JavaCameraView javaCameraView;
-//    Mat mRGBA, mRGBAT;
-//    private static final int REQUEST_CAMERA_PERMISSION = 200;
-//
-//
-//    BaseLoaderCallback baseLoaderCallback = new BaseLoaderCallback(MainActivity.this) {
-//        @Override
-//        public void onManagerConnected(int status) {
-//            switch (status)
-//            {
-//                case LoaderCallbackInterface.SUCCESS:
-//                {
-//                    javaCameraView.enableView();
-//                    break;
-//                }
-//                default:
-//                {
-//                    super.onManagerConnected(status);
-//                    break;
-//                }
-//
-//            }
-//
-//        }
-//    };
-//
-//    @Override
-//    protected void onCreate(Bundle savedInstanceState) {
-//        super.onCreate(savedInstanceState);
-//        setContentView(R.layout.activity_main);
-//
-//        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-//            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA_PERMISSION);
-//        } else {
-//            javaCameraView = (JavaCameraView) findViewById(R.id.my_camera_view);
-//            javaCameraView.setCameraIndex(CameraBridgeViewBase.CAMERA_ID_BACK);
-//            javaCameraView.setVisibility(CameraBridgeViewBase.VISIBLE);
-//            javaCameraView.setCvCameraViewListener(MainActivity.this);
-//        }
-//    }
-//
-//
-//    @Override
-//    public void onCameraViewStarted(int width, int height) {
-//        //mRGBA = new Mat(height, width, CvType.CV_8UC4);
-//    }
-//
-//    @Override
-//    public void onCameraViewStopped() {
-//
-//        //mRGBA.release();
-//    }
-//
-//    @Override
-//    public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-//        mRGBA = inputFrame.rgba();
-////        mRGBAT = mRGBA.t();
-////        Core.flip(mRGBA.t(), mRGBAT, 1);
-////        Imgproc.resize(mRGBAT, mRGBAT, mRGBA.size());
-//        return mRGBAT;
-//    }
-//
-//    @Override
-//    public void onPointerCaptureChanged(boolean hasCapture) {
-//
-//    }
-//
-//    @Override
-//    protected void onDestroy(){
-//        super.onDestroy();
-//
-//        if(javaCameraView!=null){
-//            javaCameraView.disableView();
-//        }
-//    }
-//
-//
-//    @Override
-//    protected void onPause(){
-//        super.onPause();
-//
-//        if(javaCameraView!=null){
-//            javaCameraView.disableView();
-//        }
-//    }
-//
-//    @Override
-//    protected void onResume(){
-//        super.onResume();
-//
-//        if (!OpenCVLoader.initDebug()) {
-//            OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_0_0, this, baseLoaderCallback);
-//        } else {
-//            baseLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
-//        }
-//
-//    }
-//}
