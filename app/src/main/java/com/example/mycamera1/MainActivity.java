@@ -10,6 +10,7 @@ import android.os.Handler;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.WindowManager;
+import android.widget.SeekBar;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -26,9 +27,7 @@ import org.opencv.imgproc.Imgproc;
 import java.util.Collections;
 import java.util.List;
 
-import com.google.zxing.BarcodeFormat;
 import com.google.zxing.BinaryBitmap;
-import com.google.zxing.DecodeHintType;
 import com.google.zxing.MultiFormatReader;
 import com.google.zxing.RGBLuminanceSource;
 import com.google.zxing.Result;
@@ -40,6 +39,8 @@ public class MainActivity extends CameraActivity {
     SurfaceView surfaceView1, surfaceView2;
     TextView textView1 , textView2;
     Mat mRGBA ,gray;
+    SeekBar zoomSeekBar;
+    private double currentZoomLevel = 1.0;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -49,6 +50,9 @@ public class MainActivity extends CameraActivity {
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_main);
 
+        //nie wygaszaj ekranu
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
         getPermission();
 
         surfaceView1 = findViewById(R.id.my_camera_view2);
@@ -57,8 +61,24 @@ public class MainActivity extends CameraActivity {
         textView1 = findViewById(R.id.my_text_view1);
         textView2 = findViewById(R.id.my_text_view2);
 
-
         cameraBridgeViewBase = findViewById(R.id.my_camera_view1);
+
+        zoomSeekBar = findViewById(R.id.zoomSeekBar);
+
+        zoomSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                currentZoomLevel = 1.0 - (double) progress / 200.0;
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
+        });
 
         cameraBridgeViewBase.setCvCameraViewListener(new CameraBridgeViewBase.CvCameraViewListener2() {
             @Override
@@ -77,6 +97,28 @@ public class MainActivity extends CameraActivity {
             @Override
             public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
                 mRGBA = inputFrame.rgba();
+                gray = inputFrame.gray();
+
+                // Zoom
+//                double centerX = mRGBA.width() / 2.0;
+//                double centerY = mRGBA.height() / 2.0;
+//                double scaledWidth = mRGBA.width() / currentZoomLevel;
+//                double scaledHeight = mRGBA.height() / currentZoomLevel;
+//                double zoomX = centerX - scaledWidth / 2.0;
+//                double zoomY = centerY - scaledHeight / 2.0;
+//
+//                mRGBA = new Mat(mRGBA, new org.opencv.core.Rect((int) zoomX, (int) zoomY, (int) scaledWidth, (int) scaledHeight));
+//                gray = new Mat(gray, new org.opencv.core.Rect((int) zoomX, (int) zoomY, (int) scaledWidth, (int) scaledHeight));
+
+                double zoom = currentZoomLevel;
+                Size orig = mRGBA.size();
+                int offx = (int) (0.5 * (1.0-zoom) * orig.width);
+                int offy = (int) (0.5 * (1.0-zoom) * orig.height);
+
+                // crop the part, you want to zoom into:
+                mRGBA = mRGBA.submat(offy, (int) (orig.height-offy), offx, (int) (orig.width-offx));
+                // resize to original:
+                Imgproc.resize(mRGBA, mRGBA, orig);
 
 
                 float scaleX = (float) surfaceView1.getWidth() / mRGBA.width();
@@ -85,14 +127,16 @@ public class MainActivity extends CameraActivity {
                 Matrix matrix = new Matrix();
                 matrix.setScale(scaleX, scaleY);
 
-                // Skopiowanie klatki z JavaCameraView do Mat
-                Mat rgbaCopy = mRGBA.clone();
 
                 // Konwersja do skali szarości
                 Imgproc.cvtColor(mRGBA, gray, Imgproc.COLOR_RGBA2GRAY);
 
-                Bitmap bitmap = Bitmap.createBitmap(mRGBA.width(), mRGBA.height(), Bitmap.Config.ARGB_8888);
+                // Skopiowanie klatki z JavaCameraView do Mat
+                Mat rgbaCopy = mRGBA.clone();
+
+                Bitmap bitmap = Bitmap.createBitmap(rgbaCopy.cols(), rgbaCopy.rows(), Bitmap.Config.ARGB_8888);
                 Utils.matToBitmap(rgbaCopy, bitmap);
+
                 processQRCode(bitmap);
 
                 // Wyświetlenie klatki z JavaCameraView na SurfaceView
